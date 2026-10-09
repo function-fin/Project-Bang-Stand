@@ -1,0 +1,556 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+local parentUI = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+
+if parentUI:FindFirstChild("StandBangProjectGui") then
+	parentUI.StandBangProjectGui:Destroy()
+end
+
+-- Assets configurados
+local ASSET_BTN_CLOSE   = "rbxassetid://78774633521849"
+local ASSET_SPAWN_ICON  = "rbxassetid://85337967115080"
+local ASSET_EMOTE_ICON  = "rbxassetid://112719236917302"
+local ASSET_TOGGLE_BTN  = "rbxassetid://91054103485261"
+
+-- Modos de Ação
+local MODES_LIST = {
+	{ 
+		Name = "Jojo Stand", 
+		Type = "Stand", 
+		Id = "94316855780742", 
+		FreezeTime = 0.5 
+	},
+	{ 
+		Name = "Orbit Mode", 
+		Type = "Orbit", 
+		Id = "94316855780742",
+		Radius = 8,
+		FreezeTime = 0.5
+	},
+	{ 
+		Name = "Bang Bang", 
+		Type = "BangBang", 
+		Id = "82555479370279" 
+	},
+}
+
+---------------------------------------------------------
+-- 1. ESTRUTURA DA INTERFACE (UI)
+---------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StandBangProjectGui"
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 20
+screenGui.Parent = parentUI
+
+-- Botão Flutuante Externo (78x78)
+local toggleBtn = Instance.new("ImageButton")
+toggleBtn.Name = "OpenCloseToggle"
+toggleBtn.Size = UDim2.new(0, 78, 0, 78)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.4, 0)
+toggleBtn.BackgroundTransparency = 1
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Image = ASSET_TOGGLE_BTN
+toggleBtn.Active = true
+toggleBtn.Parent = screenGui
+
+-- Janela Principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 450, 0, 310)
+mainFrame.Position = UDim2.new(0.5, -225, 0.5, -155)
+mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Parent = screenGui
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(255, 255, 255)
+mainStroke.Thickness = 3
+mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+mainStroke.Parent = mainFrame
+
+-- Top Bar
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 34)
+topBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topStroke = Instance.new("UIStroke")
+topStroke.Color = Color3.fromRGB(255, 255, 255)
+topStroke.Thickness = 1
+topStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+topStroke.Parent = topBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Size = UDim2.new(1, -45, 1, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Stand and Bang Project | SPWAN"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.Arcade
+titleLabel.Parent = topBar
+
+-- Botão Fechar Totalmente (X)
+local closeBtn = Instance.new("ImageButton")
+closeBtn.Name = "CloseButton"
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -29, 0, 5)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Image = ASSET_BTN_CLOSE
+closeBtn.Parent = topBar
+
+-- Seção Esquerda (Animações)
+local animContainer = Instance.new("Frame")
+animContainer.Name = "AnimContainer"
+animContainer.Size = UDim2.new(0.48, -8, 1, -95)
+animContainer.Position = UDim2.new(0, 8, 0, 42)
+animContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+animContainer.BorderSizePixel = 0
+animContainer.Parent = mainFrame
+
+local animStroke = Instance.new("UIStroke")
+animStroke.Color = Color3.fromRGB(255, 255, 255)
+animStroke.Thickness = 1
+animStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+animStroke.Parent = animContainer
+
+local animHeader = Instance.new("TextLabel")
+animHeader.Size = UDim2.new(1, 0, 0, 26)
+animHeader.BackgroundTransparency = 1
+animHeader.Text = "ANIMAÇÕES BANG"
+animHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
+animHeader.TextSize = 12
+animHeader.Font = Enum.Font.Arcade
+animHeader.Parent = animContainer
+
+local animScroll = Instance.new("ScrollingFrame")
+animScroll.Size = UDim2.new(1, 0, 1, -30)
+animScroll.Position = UDim2.new(0, 0, 0, 26)
+animScroll.BackgroundTransparency = 1
+animScroll.BorderSizePixel = 0
+animScroll.ScrollBarThickness = 3
+animScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+animScroll.Parent = animContainer
+
+local animPadding = Instance.new("UIPadding")
+animPadding.PaddingLeft = UDim.new(0, 6)
+animPadding.PaddingRight = UDim.new(0, 6)
+animPadding.PaddingTop = UDim.new(0, 4)
+animPadding.Parent = animScroll
+
+local animLayout = Instance.new("UIListLayout")
+animLayout.Padding = UDim.new(0, 6)
+animLayout.Parent = animScroll
+
+-- Seção Direita (Jogadores)
+local playerContainer = Instance.new("Frame")
+playerContainer.Name = "PlayerContainer"
+playerContainer.Size = UDim2.new(0.48, -8, 1, -95)
+playerContainer.Position = UDim2.new(0.52, 0, 0, 42)
+playerContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+playerContainer.BorderSizePixel = 0
+playerContainer.Parent = mainFrame
+
+local playerStroke = Instance.new("UIStroke")
+playerStroke.Color = Color3.fromRGB(255, 255, 255)
+playerStroke.Thickness = 1
+playerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+playerStroke.Parent = playerContainer
+
+local playerHeader = Instance.new("TextLabel")
+playerHeader.Size = UDim2.new(1, 0, 0, 26)
+playerHeader.BackgroundTransparency = 1
+playerHeader.Text = "Jogadores no Servidor"
+playerHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
+playerHeader.TextSize = 11
+playerHeader.Font = Enum.Font.Arcade
+playerHeader.Parent = playerContainer
+
+local playerScroll = Instance.new("ScrollingFrame")
+playerScroll.Size = UDim2.new(1, 0, 1, -30)
+playerScroll.Position = UDim2.new(0, 0, 0, 26)
+playerScroll.BackgroundTransparency = 1
+playerScroll.BorderSizePixel = 0
+playerScroll.ScrollBarThickness = 3
+playerScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+playerScroll.Parent = playerContainer
+
+local playerPadding = Instance.new("UIPadding")
+playerPadding.PaddingLeft = UDim.new(0, 6)
+playerPadding.PaddingRight = UDim.new(0, 6)
+playerPadding.PaddingTop = UDim.new(0, 4)
+playerPadding.Parent = playerScroll
+
+local playerLayout = Instance.new("UIListLayout")
+playerLayout.Padding = UDim.new(0, 5)
+playerLayout.Parent = playerScroll
+
+-- Rodapé e Ícones SPWAN
+local spwanIconLeft = Instance.new("ImageLabel")
+spwanIconLeft.Size = UDim2.new(0, 32, 0, 32)
+spwanIconLeft.Position = UDim2.new(0, 10, 1, -38)
+spwanIconLeft.BackgroundTransparency = 1
+spwanIconLeft.Image = ASSET_SPAWN_ICON
+spwanIconLeft.Parent = mainFrame
+
+local spwanIconRight = Instance.new("ImageLabel")
+spwanIconRight.Size = UDim2.new(0, 32, 0, 32)
+spwanIconRight.Position = UDim2.new(1, -42, 1, -38)
+spwanIconRight.BackgroundTransparency = 1
+spwanIconRight.Image = ASSET_SPAWN_ICON
+spwanIconRight.Parent = mainFrame
+
+-- Botão Enable / Disable
+local activateBtn = Instance.new("TextButton")
+activateBtn.Name = "ActivateButton"
+activateBtn.Size = UDim2.new(0, 170, 0, 32)
+activateBtn.Position = UDim2.new(0.5, -85, 1, -38)
+activateBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+activateBtn.BorderSizePixel = 0
+activateBtn.Text = "Enable"
+activateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+activateBtn.TextSize = 16
+activateBtn.Font = Enum.Font.Arcade
+activateBtn.Parent = mainFrame
+
+local actStroke = Instance.new("UIStroke")
+actStroke.Color = Color3.fromRGB(255, 255, 255)
+actStroke.Thickness = 2
+actStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+actStroke.Parent = activateBtn
+
+---------------------------------------------------------
+-- 2. LÓGICA DE ARRASTAR JANELA E BOTÃO EXTERNO
+---------------------------------------------------------
+local function makeDraggable(guiObject, dragHandle)
+	local dragging, dragInput, dragStart, startPos
+	dragHandle = dragHandle or guiObject
+
+	dragHandle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = guiObject.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+
+	dragHandle.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+makeDraggable(mainFrame, topBar)
+makeDraggable(toggleBtn)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+
+---------------------------------------------------------
+-- 3. EXECUÇÃO DOS MODOS
+---------------------------------------------------------
+local selectedModeData = nil
+local selectedTargetPlayer = nil
+local activeMode = false
+
+local currentTrack = nil
+local actionConnection = nil
+local noclipConnection = nil
+local orbitAngle = 0
+
+local function stopExecution()
+	activeMode = false
+	activateBtn.Text = "Enable"
+
+	if actionConnection then actionConnection:Disconnect() actionConnection = nil end
+	if noclipConnection then noclipConnection:Disconnect() noclipConnection = nil end
+
+	if currentTrack then
+		currentTrack:Stop(0.2)
+		currentTrack = nil
+	end
+
+	local char = LocalPlayer.Character
+	if char and char:FindFirstChild("Humanoid") then
+		char.Humanoid.PlatformStand = false
+	end
+end
+
+closeBtn.MouseButton1Click:Connect(function()
+	stopExecution()
+	screenGui:Destroy()
+end)
+
+local function startExecution()
+	if not selectedModeData or not selectedTargetPlayer then return end
+
+	activeMode = true
+	activateBtn.Text = "Disable"
+
+	local char = LocalPlayer.Character
+	if not char or not char:FindFirstChild("Humanoid") then return end
+	local hum = char.Humanoid
+
+	-- Noclip permanente durante o modo ativo
+	noclipConnection = RunService.Stepped:Connect(function()
+		local myChar = LocalPlayer.Character
+		if myChar then
+			for _, part in ipairs(myChar:GetDescendants()) do
+				if part:IsA("BasePart") then part.CanCollide = false end
+			end
+		end
+	end)
+
+	-- 1. Execução do Jojo Stand
+	if selectedModeData.Type == "Stand" then
+		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
+		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
+		if success and asset and asset:IsA("Animation") then
+			currentTrack = hum:LoadAnimation(asset)
+		else
+			local animObj = Instance.new("Animation")
+			animObj.AnimationId = animIdStr
+			currentTrack = hum:LoadAnimation(animObj)
+		end
+
+		if currentTrack then
+			currentTrack.Priority = Enum.AnimationPriority.Action4
+			currentTrack:Play(0.1)
+			task.delay(selectedModeData.FreezeTime or 0.5, function()
+				if currentTrack and currentTrack.IsPlaying then
+					currentTrack:AdjustSpeed(0.00000001)
+				end
+			end)
+		end
+
+		actionConnection = RunService.RenderStepped:Connect(function()
+			local myChar = LocalPlayer.Character
+			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
+
+			if not myChar or not targetChar then return end
+
+			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+			local myHum = myChar:FindFirstChild("Humanoid")
+
+			if myHRP and targetHRP then
+				if myHum then myHum.PlatformStand = true end
+				local targetOffsetCFrame = targetHRP.CFrame * CFrame.new(2.2, 0.4, 1.5)
+				myHRP.CFrame = myHRP.CFrame:Lerp(targetOffsetCFrame, 0.35)
+				myHRP.AssemblyLinearVelocity = Vector3.zero
+				myHRP.AssemblyAngularVelocity = Vector3.zero
+			end
+		end)
+
+	-- 2. Execução do Orbit Mode
+	elseif selectedModeData.Type == "Orbit" then
+		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
+		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
+		if success and asset and asset:IsA("Animation") then
+			currentTrack = hum:LoadAnimation(asset)
+		else
+			local animObj = Instance.new("Animation")
+			animObj.AnimationId = animIdStr
+			currentTrack = hum:LoadAnimation(animObj)
+		end
+
+		if currentTrack then
+			currentTrack.Priority = Enum.AnimationPriority.Action4
+			currentTrack:Play(0.1)
+			task.delay(selectedModeData.FreezeTime or 0.5, function()
+				if currentTrack and currentTrack.IsPlaying then
+					currentTrack:AdjustSpeed(0.00000001)
+				end
+			end)
+		end
+
+		orbitAngle = 0
+		actionConnection = RunService.RenderStepped:Connect(function(deltaTime)
+			local myChar = LocalPlayer.Character
+			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
+
+			if not myChar or not targetChar then return end
+
+			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+			local targetTorso = targetChar:FindFirstChild("Torso") 
+				or targetChar:FindFirstChild("UpperTorso") 
+				or targetChar:FindFirstChild("HumanoidRootPart")
+
+			if myHRP and targetTorso then
+				orbitAngle = orbitAngle + (4.5 * deltaTime)
+				local offsetX = math.cos(orbitAngle) * selectedModeData.Radius
+				local offsetZ = math.sin(orbitAngle) * selectedModeData.Radius
+				local targetPos = targetTorso.Position + Vector3.new(offsetX, 0, offsetZ)
+
+				local desiredCFrame = CFrame.new(targetPos, targetTorso.Position)
+				myHRP.CFrame = myHRP.CFrame:Lerp(desiredCFrame, 0.35)
+				myHRP.AssemblyLinearVelocity = Vector3.zero
+				myHRP.AssemblyAngularVelocity = Vector3.zero
+			end
+		end)
+
+	-- 3. Execução do Bang Bang (2.2 Studs para trás + 1.0 Stud de elevação do chão)
+	elseif selectedModeData.Type == "BangBang" then
+		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
+		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
+		if success and asset and asset:IsA("Animation") then
+			currentTrack = hum:LoadAnimation(asset)
+		else
+			local animObj = Instance.new("Animation")
+			animObj.AnimationId = animIdStr
+			currentTrack = hum:LoadAnimation(animObj)
+		end
+
+		if currentTrack then
+			currentTrack.Priority = Enum.AnimationPriority.Action4
+			currentTrack.Looped = true
+			currentTrack:Play(0.1)
+		end
+
+		actionConnection = RunService.RenderStepped:Connect(function()
+			local myChar = LocalPlayer.Character
+			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
+
+			if not myChar or not targetChar then return end
+
+			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+			local myHum = myChar:FindFirstChild("Humanoid")
+
+			if myHRP and targetHRP then
+				if myHum then myHum.PlatformStand = true end
+				-- Posiciona 2.2 studs atrás do alvo e 1.0 stud acima do chão
+				local targetOffsetCFrame = targetHRP.CFrame * CFrame.new(0, 1.0, 2.2)
+				myHRP.CFrame = myHRP.CFrame:Lerp(targetOffsetCFrame, 0.4)
+				myHRP.AssemblyLinearVelocity = Vector3.zero
+				myHRP.AssemblyAngularVelocity = Vector3.zero
+			end
+		end)
+	end
+end
+
+activateBtn.MouseButton1Click:Connect(function()
+	if activeMode then
+		stopExecution()
+	else
+		startExecution()
+	end
+end)
+
+---------------------------------------------------------
+-- 4. POVOAR ANIMAÇÕES E JOGADORES
+---------------------------------------------------------
+for _, modeData in ipairs(MODES_LIST) do
+	local aBtn = Instance.new("TextButton")
+	aBtn.Size = UDim2.new(1, -12, 0, 28)
+	aBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	aBtn.BorderSizePixel = 0
+	aBtn.Text = "     " .. modeData.Name
+	aBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	aBtn.TextSize = 10
+	aBtn.Font = Enum.Font.Arcade
+	aBtn.TextXAlignment = Enum.TextXAlignment.Left
+	aBtn.Parent = animScroll
+
+	local aStroke = Instance.new("UIStroke")
+	aStroke.Color = Color3.fromRGB(60, 60, 60)
+	aStroke.Thickness = 1
+	aStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	aStroke.Parent = aBtn
+
+	local iconImg = Instance.new("ImageLabel")
+	iconImg.Size = UDim2.new(0, 18, 0, 18)
+	iconImg.Position = UDim2.new(0, 4, 0.5, -9)
+	iconImg.BackgroundTransparency = 1
+	iconImg.Image = ASSET_EMOTE_ICON
+	iconImg.Parent = aBtn
+
+	aBtn.MouseButton1Click:Connect(function()
+		selectedModeData = modeData
+		for _, child in ipairs(animScroll:GetChildren()) do
+			if child:IsA("TextButton") then
+				child.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+				local stroke = child:FindFirstChildOfClass("UIStroke")
+				if stroke then stroke.Color = Color3.fromRGB(60, 60, 60) end
+			end
+		end
+		aBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		aStroke.Color = Color3.fromRGB(255, 255, 255)
+	end)
+end
+
+local function refreshPlayerList()
+	for _, child in ipairs(playerScroll:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local pBtn = Instance.new("TextButton")
+			pBtn.Size = UDim2.new(1, -12, 0, 26)
+			pBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+			pBtn.BorderSizePixel = 0
+			pBtn.Text = " " .. player.DisplayName .. " (@" .. player.Name .. ")"
+			pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			pBtn.TextSize = 10
+			pBtn.Font = Enum.Font.Arcade
+			pBtn.TextXAlignment = Enum.TextXAlignment.Left
+			pBtn.Parent = playerScroll
+
+			local pStroke = Instance.new("UIStroke")
+			pStroke.Color = Color3.fromRGB(60, 60, 60)
+			pStroke.Thickness = 1
+			pStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			pStroke.Parent = pBtn
+
+			pBtn.MouseButton1Click:Connect(function()
+				selectedTargetPlayer = player
+				for _, child in ipairs(playerScroll:GetChildren()) do
+					if child:IsA("TextButton") then
+						child.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+						local stroke = child:FindFirstChildOfClass("UIStroke")
+						if stroke then stroke.Color = Color3.fromRGB(60, 60, 60) end
+					end
+				end
+				pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+				pStroke.Color = Color3.fromRGB(255, 255, 255)
+			end)
+		end
+	end
+
+	playerScroll.CanvasSize = UDim2.new(0, 0, 0, playerLayout.AbsoluteContentSize.Y + 10)
+end
+
+playerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	playerScroll.CanvasSize = UDim2.new(0, 0, 0, playerLayout.AbsoluteContentSize.Y + 10)
+end)
+
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(function(player)
+	if player == selectedTargetPlayer then stopExecution() end
+	refreshPlayerList()
+end)
+
+refreshPlayerList()
