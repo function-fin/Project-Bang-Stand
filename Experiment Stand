@@ -1,3 +1,5 @@
+-- [[ STAND AND BANG PROJECT | SPWAN - DELTA EXECUTOR (FIXED & COMPLETE) ]] --
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -187,7 +189,7 @@ playerScroll.BackgroundTransparency = 1
 playerScroll.BorderSizePixel = 0
 playerScroll.ScrollBarThickness = 3
 playerScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
-playerScroll.Parent = playerContainer
+playerScroll.Parent = playerContainer -- CORRIGIDO PARA APARECER NO CONTAINER CORRETO
 
 local playerPadding = Instance.new("UIPadding")
 playerPadding.PaddingLeft = UDim.new(0, 6)
@@ -274,7 +276,7 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- 3. EXECUÇÃO DOS MODOS (INCLUINDO FLING SIMPLE)
+-- 3. EXECUÇÃO DOS MODOS (COM SUPORTE A VEÍCULOS E FLING SIMPLE)
 ---------------------------------------------------------
 local selectedModeData = nil
 local selectedTargetPlayer = nil
@@ -300,9 +302,18 @@ local function stopExecution()
 	end
 
 	local char = LocalPlayer.Character
-	if char and char:FindFirstChild("Humanoid") then
-		char.Humanoid.PlatformStand = false
-		char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	if char then
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then 
+				part.CanCollide = true 
+			end
+		end
+
+		local hum = char:FindFirstChild("Humanoid")
+		if hum then
+			hum.PlatformStand = false
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
 	end
 end
 
@@ -311,6 +322,7 @@ closeBtn.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
+-- Função inteligente de teletransporte (Move o veículo se estiver sentado, ou o HRP se estiver a pé)
 local function forceCFrame(targetCFrame)
 	local myChar = LocalPlayer.Character
 	if not myChar then return end
@@ -318,14 +330,21 @@ local function forceCFrame(targetCFrame)
 	local myHRP = myChar:FindFirstChild("HumanoidRootPart")
 	local myHum = myChar:FindFirstChild("Humanoid")
 
-	if myHRP then
-		if myHum then 
-			myHum.PlatformStand = true 
-			if myHum:GetState() ~= Enum.HumanoidStateType.Physics then
-				myHum:ChangeState(Enum.HumanoidStateType.Physics)
-			end
+	if not myHRP or not myHum then return end
+
+	if myHum.SeatPart then
+		local seat = myHum.SeatPart
+		local vehicleModel = seat:FindFirstAncestorOfClass("Model")
+
+		if vehicleModel and vehicleModel.PrimaryPart then
+			vehicleModel:SetPrimaryPartCFrame(targetCFrame)
+		else
+			seat.CFrame = targetCFrame
 		end
 
+		seat.AssemblyLinearVelocity = Vector3.zero
+		seat.AssemblyAngularVelocity = Vector3.zero
+	else
 		myHRP.CFrame = targetCFrame
 		myHRP.AssemblyLinearVelocity = Vector3.zero
 		myHRP.AssemblyAngularVelocity = Vector3.zero
@@ -410,15 +429,13 @@ local function startExecution()
 				elseif selectedModeData.Type == "BangBang" and targetHRP then
 					forceCFrame(targetHRP.CFrame * CFrame.new(0, 1.0, 2.2))
 
-				-- NOVO: FLING SIMPLE (Alterna entre dentro do torso e órbita em 7 studs em velocidade absurda)
+				-- FLING SIMPLE (Alterna entre dentro do torso e órbita em 7 studs em velocidade absurda)
 				elseif selectedModeData.Type == "FlingSimple" and targetHRP then
 					toggleFrame = not toggleFrame
 					if toggleFrame then
-						-- Teleporta para dentro do torso/HRP gerando Fling
 						forceCFrame(targetHRP.CFrame)
 					else
-						-- Teleporta rodando ao redor em 7 studs em todos os ângulos
-						orbitAngle = orbitAngle + 0.4 -- Velocidade absurda de rotação
+						orbitAngle = orbitAngle + 0.4
 						local offsetX = math.cos(orbitAngle) * selectedModeData.Radius
 						local offsetZ = math.sin(orbitAngle) * selectedModeData.Radius
 						local targetPos = targetHRP.Position + Vector3.new(offsetX, math.sin(orbitAngle) * 2, offsetZ)
@@ -457,7 +474,7 @@ activateBtn.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- 4. POVOAR ANIMAÇÕES E JOGADORES (CORREÇÃO DE TEXTO LONGO)
+-- 4. POVOAR ANIMAÇÕES E JOGADORES (COM CORREÇÃO DE TEXTO LONGO)
 ---------------------------------------------------------
 for _, modeData in ipairs(MODES_LIST) do
 	local aBtn = Instance.new("TextButton")
@@ -509,13 +526,12 @@ local function refreshPlayerList()
 			pBtn.Size = UDim2.new(1, -12, 0, 26)
 			pBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 			pBtn.BorderSizePixel = 0
-			-- Configuração para nomes longos não vazarem do botão
 			pBtn.Text = " " .. player.DisplayName .. " (@" .. player.Name .. ")"
 			pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			pBtn.TextSize = 10
 			pBtn.Font = Enum.Font.Arcade
 			pBtn.TextXAlignment = Enum.TextXAlignment.Left
-			pBtn.TextTruncate = Enum.TextTruncate.AtEnd -- Adiciona reticências (...) se o nome for grande
+			pBtn.TextTruncate = Enum.TextTruncate.AtEnd -- Evita vazamento de nomes longos
 			pBtn.ClipsDescendants = true
 			pBtn.Parent = playerScroll
 
