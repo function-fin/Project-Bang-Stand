@@ -17,7 +17,7 @@ local ASSET_SPAWN_ICON  = "rbxassetid://85337967115080"
 local ASSET_EMOTE_ICON  = "rbxassetid://112719236917302"
 local ASSET_TOGGLE_BTN  = "rbxassetid://91054103485261"
 
--- Modos de Ação
+-- Modos de Ação (Com o novo FLING SIMPLE)
 local MODES_LIST = {
 	{ 
 		Name = "Jojo Stand", 
@@ -37,6 +37,11 @@ local MODES_LIST = {
 		Type = "BangBang", 
 		Id = "82555479370279" 
 	},
+	{
+		Name = "FLING SIMPLE",
+		Type = "FlingSimple",
+		Radius = 7
+	}
 }
 
 ---------------------------------------------------------
@@ -269,7 +274,7 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- 3. EXECUÇÃO DOS MODOS
+-- 3. EXECUÇÃO DOS MODOS (INCLUINDO FLING SIMPLE)
 ---------------------------------------------------------
 local selectedModeData = nil
 local selectedTargetPlayer = nil
@@ -279,22 +284,25 @@ local currentTrack = nil
 local actionConnection = nil
 local noclipConnection = nil
 local orbitAngle = 0
+local isLoopRunning = false
 
 local function stopExecution()
 	activeMode = false
+	isLoopRunning = false
 	activateBtn.Text = "Enable"
 
 	if actionConnection then actionConnection:Disconnect() actionConnection = nil end
 	if noclipConnection then noclipConnection:Disconnect() noclipConnection = nil end
 
 	if currentTrack then
-		currentTrack:Stop(0.2)
+		currentTrack:Stop(0.1)
 		currentTrack = nil
 	end
 
 	local char = LocalPlayer.Character
 	if char and char:FindFirstChild("Humanoid") then
 		char.Humanoid.PlatformStand = false
+		char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 	end
 end
 
@@ -303,28 +311,51 @@ closeBtn.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
+local function forceCFrame(targetCFrame)
+	local myChar = LocalPlayer.Character
+	if not myChar then return end
+
+	local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+	local myHum = myChar:FindFirstChild("Humanoid")
+
+	if myHRP then
+		if myHum then 
+			myHum.PlatformStand = true 
+			if myHum:GetState() ~= Enum.HumanoidStateType.Physics then
+				myHum:ChangeState(Enum.HumanoidStateType.Physics)
+			end
+		end
+
+		myHRP.CFrame = targetCFrame
+		myHRP.AssemblyLinearVelocity = Vector3.zero
+		myHRP.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
 local function startExecution()
 	if not selectedModeData or not selectedTargetPlayer then return end
 
 	activeMode = true
+	isLoopRunning = true
 	activateBtn.Text = "Disable"
 
 	local char = LocalPlayer.Character
 	if not char or not char:FindFirstChild("Humanoid") then return end
 	local hum = char.Humanoid
 
-	-- Noclip permanente durante o modo ativo
 	noclipConnection = RunService.Stepped:Connect(function()
 		local myChar = LocalPlayer.Character
 		if myChar then
 			for _, part in ipairs(myChar:GetDescendants()) do
-				if part:IsA("BasePart") then part.CanCollide = false end
+				if part:IsA("BasePart") then 
+					part.CanCollide = false 
+				end
 			end
 		end
 	end)
 
-	-- 1. Execução do Jojo Stand
-	if selectedModeData.Type == "Stand" then
+	-- Carrega animação se o modo possuir ID
+	if selectedModeData.Id then
 		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
 		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
 		if success and asset and asset:IsA("Animation") then
@@ -337,118 +368,84 @@ local function startExecution()
 
 		if currentTrack then
 			currentTrack.Priority = Enum.AnimationPriority.Action4
-			currentTrack:Play(0.1)
-			task.delay(selectedModeData.FreezeTime or 0.5, function()
-				if currentTrack and currentTrack.IsPlaying then
-					currentTrack:AdjustSpeed(0.00000001)
-				end
-			end)
-		end
-
-		actionConnection = RunService.RenderStepped:Connect(function()
-			local myChar = LocalPlayer.Character
-			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
-
-			if not myChar or not targetChar then return end
-
-			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-			local myHum = myChar:FindFirstChild("Humanoid")
-
-			if myHRP and targetHRP then
-				if myHum then myHum.PlatformStand = true end
-				local targetOffsetCFrame = targetHRP.CFrame * CFrame.new(2.2, 0.4, 1.5)
-				myHRP.CFrame = myHRP.CFrame:Lerp(targetOffsetCFrame, 0.35)
-				myHRP.AssemblyLinearVelocity = Vector3.zero
-				myHRP.AssemblyAngularVelocity = Vector3.zero
+			if selectedModeData.Type == "BangBang" then
+				currentTrack.Looped = true
 			end
-		end)
+			currentTrack:Play(0.05)
 
-	-- 2. Execução do Orbit Mode
-	elseif selectedModeData.Type == "Orbit" then
-		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
-		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
-		if success and asset and asset:IsA("Animation") then
-			currentTrack = hum:LoadAnimation(asset)
-		else
-			local animObj = Instance.new("Animation")
-			animObj.AnimationId = animIdStr
-			currentTrack = hum:LoadAnimation(animObj)
+			if selectedModeData.FreezeTime then
+				task.delay(selectedModeData.FreezeTime, function()
+					if currentTrack and currentTrack.IsPlaying then
+						currentTrack:AdjustSpeed(0.00000001)
+					end
+				end)
+			end
 		end
+	end
 
-		if currentTrack then
-			currentTrack.Priority = Enum.AnimationPriority.Action4
-			currentTrack:Play(0.1)
-			task.delay(selectedModeData.FreezeTime or 0.5, function()
-				if currentTrack and currentTrack.IsPlaying then
-					currentTrack:AdjustSpeed(0.00000001)
-				end
-			end)
-		end
+	-- Loop hyper-potente para os modos
+	task.spawn(function()
+		local toggleFrame = false
+		while isLoopRunning and activeMode do
+			task.wait()
 
-		orbitAngle = 0
-		actionConnection = RunService.RenderStepped:Connect(function(deltaTime)
-			local myChar = LocalPlayer.Character
 			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
+			if targetChar then
+				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+				local targetTorso = targetChar:FindFirstChild("Torso") 
+					or targetChar:FindFirstChild("UpperTorso") 
+					or targetHRP
 
-			if not myChar or not targetChar then return end
+				if selectedModeData.Type == "Stand" and targetHRP then
+					forceCFrame(targetHRP.CFrame * CFrame.new(2.2, 0.4, 1.5))
 
-			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-			local targetTorso = targetChar:FindFirstChild("Torso") 
-				or targetChar:FindFirstChild("UpperTorso") 
-				or targetChar:FindFirstChild("HumanoidRootPart")
+				elseif selectedModeData.Type == "Orbit" and targetTorso then
+					orbitAngle = orbitAngle + 0.08
+					local offsetX = math.cos(orbitAngle) * selectedModeData.Radius
+					local offsetZ = math.sin(orbitAngle) * selectedModeData.Radius
+					local targetPos = targetTorso.Position + Vector3.new(offsetX, 0, offsetZ)
 
-			if myHRP and targetTorso then
-				orbitAngle = orbitAngle + (4.5 * deltaTime)
+					forceCFrame(CFrame.new(targetPos, targetTorso.Position))
+
+				elseif selectedModeData.Type == "BangBang" and targetHRP then
+					forceCFrame(targetHRP.CFrame * CFrame.new(0, 1.0, 2.2))
+
+				-- NOVO: FLING SIMPLE (Alterna entre dentro do torso e órbita em 7 studs em velocidade absurda)
+				elseif selectedModeData.Type == "FlingSimple" and targetHRP then
+					toggleFrame = not toggleFrame
+					if toggleFrame then
+						-- Teleporta para dentro do torso/HRP gerando Fling
+						forceCFrame(targetHRP.CFrame)
+					else
+						-- Teleporta rodando ao redor em 7 studs em todos os ângulos
+						orbitAngle = orbitAngle + 0.4 -- Velocidade absurda de rotação
+						local offsetX = math.cos(orbitAngle) * selectedModeData.Radius
+						local offsetZ = math.sin(orbitAngle) * selectedModeData.Radius
+						local targetPos = targetHRP.Position + Vector3.new(offsetX, math.sin(orbitAngle) * 2, offsetZ)
+						forceCFrame(CFrame.new(targetPos, targetHRP.Position))
+					end
+				end
+			end
+		end
+	end)
+
+	actionConnection = RunService.RenderStepped:Connect(function()
+		local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
+		if targetChar then
+			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+			local targetTorso = targetChar:FindFirstChild("Torso") or targetHRP
+
+			if selectedModeData.Type == "Stand" and targetHRP then
+				forceCFrame(targetHRP.CFrame * CFrame.new(2.2, 0.4, 1.5))
+			elseif selectedModeData.Type == "Orbit" and targetTorso then
 				local offsetX = math.cos(orbitAngle) * selectedModeData.Radius
 				local offsetZ = math.sin(orbitAngle) * selectedModeData.Radius
-				local targetPos = targetTorso.Position + Vector3.new(offsetX, 0, offsetZ)
-
-				local desiredCFrame = CFrame.new(targetPos, targetTorso.Position)
-				myHRP.CFrame = myHRP.CFrame:Lerp(desiredCFrame, 0.35)
-				myHRP.AssemblyLinearVelocity = Vector3.zero
-				myHRP.AssemblyAngularVelocity = Vector3.zero
+				forceCFrame(CFrame.new(targetTorso.Position + Vector3.new(offsetX, 0, offsetZ), targetTorso.Position))
+			elseif selectedModeData.Type == "BangBang" and targetHRP then
+				forceCFrame(targetHRP.CFrame * CFrame.new(0, 1.0, 2.2))
 			end
-		end)
-
-	-- 3. Execução do Bang Bang (2.2 Studs para trás + 1.0 Stud de elevação do chão)
-	elseif selectedModeData.Type == "BangBang" then
-		local animIdStr = "rbxassetid://" .. tostring(selectedModeData.Id)
-		local success, asset = pcall(function() return game:GetObjects(animIdStr)[1] end)
-		if success and asset and asset:IsA("Animation") then
-			currentTrack = hum:LoadAnimation(asset)
-		else
-			local animObj = Instance.new("Animation")
-			animObj.AnimationId = animIdStr
-			currentTrack = hum:LoadAnimation(animObj)
 		end
-
-		if currentTrack then
-			currentTrack.Priority = Enum.AnimationPriority.Action4
-			currentTrack.Looped = true
-			currentTrack:Play(0.1)
-		end
-
-		actionConnection = RunService.RenderStepped:Connect(function()
-			local myChar = LocalPlayer.Character
-			local targetChar = selectedTargetPlayer and selectedTargetPlayer.Character
-
-			if not myChar or not targetChar then return end
-
-			local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-			local myHum = myChar:FindFirstChild("Humanoid")
-
-			if myHRP and targetHRP then
-				if myHum then myHum.PlatformStand = true end
-				-- Posiciona 2.2 studs atrás do alvo e 1.0 stud acima do chão
-				local targetOffsetCFrame = targetHRP.CFrame * CFrame.new(0, 1.0, 2.2)
-				myHRP.CFrame = myHRP.CFrame:Lerp(targetOffsetCFrame, 0.4)
-				myHRP.AssemblyLinearVelocity = Vector3.zero
-				myHRP.AssemblyAngularVelocity = Vector3.zero
-			end
-		end)
-	end
+	end)
 end
 
 activateBtn.MouseButton1Click:Connect(function()
@@ -460,7 +457,7 @@ activateBtn.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- 4. POVOAR ANIMAÇÕES E JOGADORES
+-- 4. POVOAR ANIMAÇÕES E JOGADORES (CORREÇÃO DE TEXTO LONGO)
 ---------------------------------------------------------
 for _, modeData in ipairs(MODES_LIST) do
 	local aBtn = Instance.new("TextButton")
@@ -512,11 +509,14 @@ local function refreshPlayerList()
 			pBtn.Size = UDim2.new(1, -12, 0, 26)
 			pBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 			pBtn.BorderSizePixel = 0
+			-- Configuração para nomes longos não vazarem do botão
 			pBtn.Text = " " .. player.DisplayName .. " (@" .. player.Name .. ")"
 			pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			pBtn.TextSize = 10
 			pBtn.Font = Enum.Font.Arcade
 			pBtn.TextXAlignment = Enum.TextXAlignment.Left
+			pBtn.TextTruncate = Enum.TextTruncate.AtEnd -- Adiciona reticências (...) se o nome for grande
+			pBtn.ClipsDescendants = true
 			pBtn.Parent = playerScroll
 
 			local pStroke = Instance.new("UIStroke")
